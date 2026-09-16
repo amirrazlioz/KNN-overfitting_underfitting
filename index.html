@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KNN - מעבדה אינטראקטיבית לגבול החלטה</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8c8d; margin-bottom: 20px; }
+        
+        .instruction-box {
+            background-color: #eef6fc;
+            border-right: 5px solid #3498db;
+            padding: 12px 18px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.05em;
+            color: #1a5276;
+            font-weight: bold;
+        }
+
+        .metrics-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            flex: 1;
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .metric-card.train { border-color: #00c853; background-color: #f1f8f2; }
+        .metric-card.test { border-color: #2980b9; background-color: #f2f8fc; }
+
+        .metric-title {
+            font-weight: bold;
+            font-size: 1.05em;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .metric-desc {
+            font-size: 0.85em;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        .sample-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 10px;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            font-size: 0.82em;
+            font-weight: bold;
+            flex-wrap: wrap;
+        }
+
+        .sample-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .sample-train-0 { color: #00c853; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 1px #000; }
+        .sample-train-1 { width: 11px; height: 11px; background-color: #ffea00; border: 1.5px solid #d84315; border-radius: 50%; display: inline-block; }
+        
+        .sample-test-type1 { 
+            width: 9px; 
+            height: 9px; 
+            background-color: #ffea00; 
+            border: 2px solid #d84315; 
+            transform: rotate(45deg); 
+            display: inline-block; 
+        }
+
+        .sample-test-type2 { 
+            width: 0; 
+            height: 0; 
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 10px solid #00c853; 
+            display: inline-block; 
+        }
+
+        .controls-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider-group label {
+            font-weight: bold;
+            min-width: 140px;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            height: 6px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .val-badge {
+            background-color: #3498db;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-weight: bold;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .buttons-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            background-color: #eceff1;
+            color: #37474f;
+            border: 1px solid #cfd8dc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn:hover { background-color: #cfd8dc; }
+
+        .plot-container {
+            position: relative;
+            width: 100%;
+            height: 520px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        #mainPlot {
+            width: 100%;
+            height: 100%;
+        }
+
+        .status-box {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.05em;
+        }
+        .status-overfit { background-color: #ffebee; color: #c62828; }
+        .status-good { background-color: #e8f5e9; color: #2e7d32; }
+        .status-underfit { background-color: #fff3e0; color: #ef6c00; }
+
+        .point-info-box {
+            margin-top: 15px;
+            padding: 14px;
+            background-color: #f3e5f5;
+            border: 2px solid #ab47bc;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #4a148c;
+            display: none;
+        }
+
+        #errorLog {
+            background-color: #ffebee;
+            color: #b71c1c;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border: 1px solid #ef9a9a;
+            display: none;
+            font-family: monospace;
+            direction: ltr;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>מעבדת KNN - אימון, מבחן וגבול החלטה</h1>
+    <p class="subtitle">חקירת מדדי דיוק והכללה בזמן אמת</p>
+
+    <div id="errorLog"></div>
+
+    <div class="instruction-box">
+        👆 מעוין (אמיתי: 1) = צהוב | משולש (אמיתי: 0) = ירוק. האם המודל צבע את האזור נכון לפי הצורה?
+    </div>
+
+    <div class="metrics-container">
+        <div class="metric-card test">
+            <div class="metric-title" style="color: #2980b9;">דיוק מבחן (Test Accuracy)</div>
+            <div id="testAcc" class="metric-value" style="color: #2980b9;">0%</div>
+            <div class="metric-desc">האם צבע הרקע תואם את הערך האמיתי של הצורה?</div>
+            <div class="sample-preview" style="border: 1px solid #2980b9; color: #154360;">
+                <div class="sample-item">
+                    <span>מעוין (אמיתי: 1):</span>
+                    <span class="sample-test-type1"></span>
+                </div>
+                <span style="color: #bdc3c7;">|</span>
+                <div class="sample-item">
+                    <span>משולש (אמיתי: 0):</span>
+                    <span class="sample-test-type2"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="metric-card train">
+            <div class="metric-title" style="color: #00c853;">דיוק אימון (Train Accuracy)</div>
+            <div id="trainAcc" class="metric-value" style="color: #00c853;">0%</div>
+            <div class="metric-desc">מעיד עד כמה האלגוריתם למד את נתוני האימון</div>
+            <div class="sample-preview" style="border: 1px solid #00c853; color: #00c853;">
+                <div class="sample-item">
+                    <span style="color: #333;">נקודות אימון:</span>
+                    <span class="sample-train-0">✖</span>
+                    <span class="sample-train-1"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-panel">
+        <div class="slider-group">
+            <label for="kSlider">ערך K:</label>
+            <input type="range" id="kSlider" min="1" max="25" value="7" step="2" oninput="onKSliderChange(this.value)">
+            <span id="kValDisplay" class="val-badge">7</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="countSlider">כמות נקודות:</label>
+            <input type="range" id="countSlider" min="20" max="150" value="60" step="5" oninput="onCountSliderChange(this.value)">
+            <span id="countValDisplay" class="val-badge" style="background-color: #3498db;">60</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="trainRatioSlider">אחוז אימון (Train %):</label>
+            <input type="range" id="trainRatioSlider" min="50" max="90" value="70" step="5" oninput="onTrainRatioChange(this.value)">
+            <span id="trainRatioValDisplay" class="val-badge" style="background-color: #00c853;">70%</span>
+        </div>
+
+        <div class="buttons-group">
+            <button class="btn" onclick="setPreset(1)">K = 1 (Overfitting)</button>
+            <button class="btn" onclick="setPreset(7)">K = 7 (Optimal)</button>
+            <button class="btn" onclick="setPreset(25)">Underfitting (K=25 קו ישר)</button>
+            <button class="btn" style="background-color: #eceff1; margin-right: auto;" onclick="generateDataAndRedraw()">נתונים חדשים 🔄</button>
+        </div>
+    </div>
+
+    <div class="plot-container">
+        <div id="mainPlot"></div>
+    </div>
+
+    <div id="statusBox" class="status-box status-good">
+        מצב נוכחי: Appropriate-fitting (גבול חלק ומאוזן)
+    </div>
+
+    <div id="pointInfoBox" class="point-info-box"></div>
+</div>
+
+<script>
+    let trainSet = [];
+    let testSetType1 = []; 
+    let testSetType2 = []; 
+    const GRID_RES = 50; 
+    let currentK = 7;
+    let numPoints = 60;
+    let trainRatio = 0.7; // אחוז נקודות האימון מתוך סך הכל הנקודות
+    let newTestPoint = null;
+    let isClickEventAttached = false;
+
+    function showError(msg) {
+        const errBox = document.getElementById('errorLog');
+        errBox.style.display = 'block';
+        errBox.innerText = "Error: " + msg;
+        console.error(msg);
+    }
+
+    function generateDataset() {
+        trainSet = [];
+        testSetType1 = [];
+        testSetType2 = [];
+        newTestPoint = null;
+        document.getElementById('pointInfoBox').style.display = 'none';
+
+        for (let i = 0; i < numPoints; i++) {
+            let x = Math.random();
+            let y = Math.random();
+            
+            // חישוב התווית האמיתית על פי עקומת הגבול
+            let boundary = 0.85 * Math.pow(x - 0.45, 2) + 0.32;
+            let label = y > boundary ? 1 : 0;
+
+            if (Math.random() < 0.08) {
+                label = 1 - label;
+            }
+
+            // פיצול בין Train ל-Test לפי אחוז האימון הנבחר
+            if (Math.random() < trainRatio) {
+                trainSet.push({ x: x, y: y, label: label });
+            } else {
+                if (label === 1) {
+                    testSetType1.push({ x: x, y: y, label: label });
+                } else {
+                    testSetType2.push({ x: x, y: y, label: label });
+                }
+            }
+        }
+        
+        // הבטחה שתמיד תהיה לפחות נקודת מבחן אחת מכל סוג
+        if (testSetType1.length === 0 && trainSet.length > 0) {
+            testSetType1.push({ x: 0.2, y: 0.8, label: 1 });
+        }
+        if (testSetType2.length === 0 && trainSet.length > 0) {
+            testSetType2.push({ x: 0.8, y: 0.2, label: 0 });
+        }
+    }
+
+    function euclideanDistSq(x1, y1, x2, y2) {
+        return (x1 - x2) ** 2 + (y1 - y2) ** 2;
+    }
+
+    function classifyKNN(x, y, k) {
+        let distances = trainSet.map(p => ({
+            x: p.x,
+            y: p.y,
+            label: p.label,
+            dist: euclideanDistSq(x, y, p.x, p.y)
+        }));
+        distances.sort((a, b) => a.dist - b.dist);
+        let actualK = Math.min(k, trainSet.length);
+        let kNearest = distances.slice(0, actualK);
+        let sum = kNearest.reduce((acc, curr) => acc + curr.label, 0);
+        return {
+            prob: sum / actualK,
+            neighbors: kNearest
+        };
+    }
+
+    function classifyLinear(x, y) {
+        let lineY = -0.45 * x + 0.68;
+        return {
+            prob: y > lineY ? 1 : 0,
+            neighbors: []
+        };
+    }
+
+    function calculateMetrics() {
+        let isLinearMode = (currentK === 25);
+        
+        let trainCorrect = 0;
+        trainSet.forEach(p => {
+            let res = isLinearMode ? classifyLinear(p.x, p.y) : classifyKNN(p.x, p.y, currentK);
+            let pred = res.prob >= 0.5 ? 1 : 0;
+            if (pred === p.label) trainCorrect++;
+        });
+        let trainAcc = trainSet.length > 0 ? Math.round((trainCorrect / trainSet.length) * 100) : 0;
+
+        let totalTest = testSetType1.length + testSetType2.length;
+        let testCorrect = 0;
+
+        let evaluateTestPoint = (p) => {
+            let res = isLinearMode ? classifyLinear(p.x, p.y) : classifyKNN(p.x, p.y, currentK);
+            let pred = res.prob >= 0.5 ? 1 : 0;
+            if (pred === p.label) testCorrect++;
+        };
+
+        testSetType1.forEach(evaluateTestPoint);
+        testSetType2.forEach(evaluateTestPoint);
+
+        let testAcc = totalTest > 0 ? Math.round((testCorrect / totalTest) * 100) : 0;
+
+        document.getElementById('trainAcc').innerText = trainAcc + '%';
+        document.getElementById('testAcc').innerText = testAcc + '%';
+    }
+
+    function updatePlot() {
+        try {
+            if (typeof Plotly === 'undefined') {
+                setTimeout(updatePlot, 200);
+                return;
+            }
+
+            calculateMetrics();
+
+            let xVals = [];
+            let yVals = [];
+            let zGrid = [];
+
+            let isLinearMode = (currentK === 25);
+
+            for (let i = 0; i < GRID_RES; i++) {
+                xVals.push(i / (GRID_RES - 1));
+                yVals.push(i / (GRID_RES - 1));
+            }
+
+            for (let j = 0; j < GRID_RES; j++) {
+                let row = [];
+                for (let i = 0; i < GRID_RES; i++) {
+                    if (isLinearMode) {
+                        row.push(classifyLinear(xVals[i], yVals[j]).prob);
+                    } else {
+                        row.push(classifyKNN(xVals[i], yVals[j], currentK).prob);
+                    }
+                }
+                zGrid.push(row);
+            }
+
+            const contourTrace = {
+                x: xVals,
+                y: yVals,
+                z: zGrid,
+                type: 'heatmap',
+                zsmooth: isLinearMode ? false : 'best',
+                showscale: false,
+                colorscale: [
+                    [0, '#c8e6c9'],
+                    [0.5, '#e8f5e9'],
+                    [0.51, '#fff9c4'],
+                    [1, '#fff176']
+                ],
+                hoverinfo: 'none'
+            };
+
+            const boundaryLineTrace = {
+                x: xVals,
+                y: yVals,
+                z: zGrid,
+                type: 'contour',
+                showscale: false,
+                contours: { start: 0.5, end: 0.5, size: 0, coloring: 'none' },
+                line: { color: '#d32f2f', width: 3 },
+                hoverinfo: 'none'
+            };
+
+            const train0 = trainSet.filter(p => p.label === 0);
+            const traceTrain0 = {
+                x: train0.map(p => p.x),
+                y: train0.map(p => p.y),
+                mode: 'markers',
+                marker: { color: '#00c853', symbol: 'x', size: 11, line: { width: 3 } },
+                hoverinfo: 'text',
+                text: train0.map(p => `אימון (0 - ירוק)<br>X: ${p.x.toFixed(2)}, Y: ${p.y.toFixed(2)}`),
+                showlegend: false
+            };
+
+            const train1 = trainSet.filter(p => p.label === 1);
+            const traceTrain1 = {
+                x: train1.map(p => p.x),
+                y: train1.map(p => p.y),
+                mode: 'markers',
+                marker: { color: '#ffea00', symbol: 'circle', size: 11, line: { color: '#d84315', width: 2 } },
+                hoverinfo: 'text',
+                text: train1.map(p => `אימון (1 - צהוב)<br>X: ${p.x.toFixed(2)}, Y: ${p.y.toFixed(2)}`),
+                showlegend: false
+            };
+
+            const getTestHoverText = (p, typeName, expectedColor) => {
+                let res = isLinearMode ? classifyLinear(p.x, p.y) : classifyKNN(p.x, p.y, currentK);
+                let pred = res.prob >= 0.5 ? 1 : 0;
+                let isSuccess = pred === p.label;
+                let statusText = isSuccess ? "✅ הצלחה בחיזוי" : "❌ שגיאה בחיזוי";
+                let probPercent = Math.round(res.prob * 100);
+                let modelColorName = pred === 1 ? "צהוב (1)" : "ירוק (0)";
+                return `<b>${typeName}</b><br>` +
+                       `ערך אמיתי: ${expectedColor}<br>` +
+                       `חיזוי המודל: ${modelColorName} (${probPercent}% צהוב)<br>` +
+                       `סטטוס: <b>${statusText}</b>`;
+            };
+
+            const testType1Filtered = testSetType1.filter(p => p.label === 1);
+            const testType2Filtered = testSetType2.filter(p => p.label === 0);
+
+            const traceTestType1 = {
+                x: testType1Filtered.map(p => p.x),
+                y: testType1Filtered.map(p => p.y),
+                mode: 'markers',
+                marker: { color: '#ffea00', symbol: 'diamond', size: 14, line: { color: '#d84315', width: 2 } },
+                hoverinfo: 'text',
+                text: testType1Filtered.map(p => getTestHoverText(p, "מעוין", "צהוב (1)")),
+                showlegend: false
+            };
+
+            const traceTestType2 = {
+                x: testType2Filtered.map(p => p.x),
+                y: testType2Filtered.map(p => p.y),
+                mode: 'markers',
+                marker: { color: '#00c853', symbol: 'triangle-down', size: 14, line: { color: '#1b5e20', width: 1.5 } },
+                hoverinfo: 'text',
+                text: testType2Filtered.map(p => getTestHoverText(p, "משולש", "ירוק (0)")),
+                showlegend: false
+            };
+
+            let traces = [contourTrace, boundaryLineTrace, traceTrain0, traceTrain1, traceTestType1, traceTestType2];
+
+            if (newTestPoint) {
+                let res = isLinearMode ? classifyLinear(newTestPoint.x, newTestPoint.y) : classifyKNN(newTestPoint.x, newTestPoint.y, currentK);
+
+                let isClass1 = res.prob >= 0.5;
+                let fillColor = isClass1 ? '#ffea00' : '#00c853'; 
+                let strokeColor = isClass1 ? '#d84315' : '#1b5e20';
+                let predLabel = isClass1 ? "עיגול צהוב (1) 🟡" : "איקס ירוק (0) 🟢";
+
+                if (!isLinearMode) {
+                    res.neighbors.forEach(n => {
+                        traces.push({
+                            x: [newTestPoint.x, n.x],
+                            y: [newTestPoint.y, n.y],
+                            mode: 'lines',
+                            line: { color: '#7b1fa2', width: 1.8, dash: 'dot' },
+                            hoverinfo: 'none',
+                            showlegend: false
+                        });
+                    });
+                }
+
+                const testPointTrace = {
+                    x: [newTestPoint.x],
+                    y: [newTestPoint.y],
+                    mode: 'markers',
+                    marker: { color: fillColor, size: 24, line: { color: strokeColor, width: 3.5 } },
+                    hoverinfo: 'text',
+                    text: [`נקודה אינטראקטיבית<br>חיזוי: ${predLabel}<br>הסתברות צהוב: ${Math.round(res.prob * 100)}%`],
+                    showlegend: false
+                };
+                traces.push(testPointTrace);
+
+                const infoBox = document.getElementById('pointInfoBox');
+                infoBox.style.display = 'block';
+                infoBox.innerHTML = `📍 נקודת בדיקה במיקום (${newTestPoint.x.toFixed(2)}, ${newTestPoint.y.clientY ? newTestPoint.y.toFixed(2) : newTestPoint.y.toFixed(2)}) סווגה כ: <span style="color: ${strokeColor}; font-size: 1.2em;">${predLabel}</span> (הסתברות: ${Math.round(res.prob * 100)}%)`;
+            }
+
+            const layout = {
+                margin: { t: 15, l: 20, r: 20, b: 20 },
+                xaxis: { range: [0, 1], zeroline: false, showticklabels: false },
+                yaxis: { range: [0, 1], zeroline: false, showticklabels: false },
+                showlegend: false
+            };
+
+            Plotly.newPlot('mainPlot', traces, layout, { displayModeBar: false, responsive: true });
+
+            if (!isClickEventAttached) {
+                isClickEventAttached = true;
+                const plotDiv = document.getElementById('mainPlot');
+                plotDiv.on('plotly_click', function(data){
+                    if(data && data.points && data.points[0]){
+                        newTestPoint = {
+                            x: data.points[0].x,
+                            y: data.points[0].y
+                        };
+                        updatePlot();
+                    }
+                });
+            }
+
+            updateStatusUI();
+        } catch (err) {
+            showError(err.message + " at " + err.stack);
+        }
+    }
+
+    function onKSliderChange(val) {
+        currentK = parseInt(val);
+        document.getElementById('kValDisplay').innerText = currentK;
+        updatePlot();
+    }
+
+    function onCountSliderChange(val) {
+        numPoints = parseInt(val);
+        document.getElementById('countValDisplay').innerText = numPoints;
+        generateDataAndRedraw();
+    }
+
+    function onTrainRatioChange(val) {
+        trainRatio = parseInt(val) / 100;
+        document.getElementById('trainRatioValDisplay').innerText = val + '%';
+        generateDataAndRedraw();
+    }
+
+    function setPreset(k) {
+        currentK = k;
+        document.getElementById('kSlider').value = k;
+        document.getElementById('kValDisplay').innerText = k;
+        updatePlot();
+    }
+
+    function updateStatusUI() {
+        const box = document.getElementById('statusBox');
+        if (currentK === 25) {
+            box.className = "status-box status-underfit";
+            box.innerText = `מצב נוכחי: Under-fitting (K = 25) - קו הפרדה ישר`;
+        } else if (currentK <= 3) {
+            box.className = "status-box status-overfit";
+            box.innerText = `מצב נוכחי: Over-fitting (K = ${currentK}) - קו מפותל ורגיש`;
+        } else {
+            box.className = "status-box status-good";
+            box.innerText = `מצב נוכחי: Appropriate-fitting (K = ${currentK}) - גבול מאוזן וחלק`;
+        }
+    }
+
+    function generateDataAndRedraw() {
+        generateDataset();
+        updatePlot();
+    }
+
+    window.onload = function() {
+        generateDataAndRedraw();
+    };
+</script>
+
+</body>
+</html>
